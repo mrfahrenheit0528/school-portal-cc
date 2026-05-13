@@ -5,3 +5,172 @@
     <p>This is the central hub for all CSEC students and faculty.</p>
     <p>Please use the navigation menu to view recent announcements, upcoming events, and download necessary department files.</p>
 {% endblock %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>School Portal — CS Department</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav class="navbar">
+    <a class="navbar-brand" href="#" onclick="showPage('home')">
+      <div class="navbar-logo">CS</div>
+      <div class="navbar-brand-text">
+        <div class="navbar-brand-title">Computer Science Dept.</div>
+        <div class="navbar-brand-sub">CSEC Student &amp; Faculty Portal</div>
+      </div>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#" id="nav-home"          onclick="showPage('home')"          class="active">🏠 Home</a></li>
+      <li><a href="#" id="nav-announcements" onclick="showPage('announcements')"             >📢 Announcements</a></li>
+      <li><a href="#" id="nav-downloads"     onclick="showPage('downloads')"                >📁 Downloads</a></li>
+    </ul>
+  </nav>
+
+  <!-- HOME PAGE -->
+  <div id="page-home" class="page active">
+    <div class="hero">
+      <div class="hero-tag">✦ Academic Year 2025–2026</div>
+      <h1>Welcome to the <span>Computer Science</span> Department Portal</h1>
+      <p class="hero-desc">The central hub for all CSEC students and faculty — announcements, events, and department resources in one place.</p>
+      <div class="hero-cta-row">
+        <a href="#" class="btn-primary" onclick="showPage('announcements')">View Announcements</a>
+        <a href="#" class="btn-outline"  onclick="showPage('downloads')">Download Resources</a>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-heading">
+        <div class="section-icon">🧭</div>
+        <div>
+          <h2>Quick Navigation</h2>
+          <p>Browse the portal sections below</p>
+        </div>
+      </div>
+
+      <div class="quick-links">
+        <a href="#" class="quick-card" onclick="showPage('announcements')">
+          <div class="quick-icon">📢</div>
+          <h3>Announcements &amp; Events</h3>
+          <p>Stay updated on deadlines, department meetings, and important notices.</p>
+        </a>
+        <a href="#" class="quick-card" onclick="showPage('downloads')">
+          <div class="quick-icon">📁</div>
+          <h3>File Downloads</h3>
+          <p>Access syllabus files, rubrics, clearance forms, and other department documents.</p>
+        </a>
+        <a href="#" class="quick-card" onclick="showPage('home')">
+          <div class="quick-icon">📋</div>
+          <h3>Department Info</h3>
+          <p>Learn more about the CSEC program, faculty, and academic offerings.</p>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ANNOUNCEMENTS PAGE -->
+  <div id="page-announcements" class="page">
+    <div class="section">
+      <div class="section-heading">
+        <div class="section-icon">📢</div>
+        <div>
+          <h2>Announcements &amp; Events</h2>
+          <p>Latest updates from the Computer Science Department</p>
+        </div>
+      </div>
+
+      <div class="announcement-list">
+        <div class="announcement-card urgent">
+          <div class="ann-meta">
+            <span class="ann-badge badge-urgent">🔴 Urgent</span>
+            <span class="ann-date">Posted on: May 15, 2026</span>
+          </div>
+          <div class="ann-title">Final Project Deadlines</div>
+          <div class="ann-body">All CSEC 3 final projects must be deployed on Azure and submitted via GitHub. Failure to submit before the deadline will result in a grade of incomplete. Please coordinate with your team leads immediately.</div>
+        </div>
+
+        <div class="announcement-card event">
+          <div class="ann-meta">
+            <span class="ann-badge badge-event">📅 Event</span>
+            <span class="ann-date">Posted on: May 20, 2026</span>
+          </div>
+          <div class="ann-title">Department Town Hall</div>
+          <div class="ann-body">Join the faculty for the end-of-semester department meeting. This is an open session for students and faculty to discuss academic concerns, curriculum updates, and plans for the upcoming academic year.</div>
+        </div>
+
+        <div class="announcement-card">
+          <div class="ann-meta">
+            <span class="ann-badge badge-announcement">📋 Notice</span>
+            <span class="ann-date">Posted on: May 10, 2026</span>
+          </div>
+          <div class="ann-title">Enrollment Advisory for 2nd Semester</div>
+          <div class="ann-body">Students who have not yet submitted their pre-enrollment forms for the 2nd semester are advised to do so before May 25. Consult your academic advisers for subject recommendations.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DOWNLOADS PAGE -->
+  <div id="page-downloads" class="page">
+    <div class="section">
+      <div class="section-heading">
+        <div class="section-icon">📁</div>
+        <div>
+          <h2>File Downloads</h2>
+          <p>Download official department resources below</p>
+        </div>
+      </div>
+
+      <div class="downloads-grid">
+        <div class="file-card">
+          <div class="file-icon-row">
+            <div class="file-icon icon-pdf">📄</div>
+            <div class="file-info">
+              <div class="file-name">CSEC3_Syllabus.pdf</div>
+              <div class="file-size">1.2 MB · PDF Document</div>
+            </div>
+          </div>
+          <a href="#" class="download-btn">⬇ Download</a>
+        </div>
+
+        <div class="file-card">
+          <div class="file-icon-row">
+            <div class="file-icon icon-docx">📝</div>
+            <div class="file-info">
+              <div class="file-name">Project_Rubric.docx</div>
+              <div class="file-size">45 KB · Word Document</div>
+            </div>
+          </div>
+          <a href="#" class="download-btn">⬇ Download</a>
+        </div>
+
+        <div class="file-card">
+          <div class="file-icon-row">
+            <div class="file-icon icon-pdf">📄</div>
+            <div class="file-info">
+              <div class="file-name">Department_Clearance.pdf</div>
+              <div class="file-size">210 KB · PDF Document</div>
+            </div>
+          </div>
+          <a href="#" class="download-btn">⬇ Download</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <span>CS Department Portal</span> &nbsp;·&nbsp; CSEC Academic Year 2025–2026 &nbsp;·&nbsp; All rights reserved
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
