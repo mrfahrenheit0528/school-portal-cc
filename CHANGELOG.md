@@ -9,7 +9,7 @@ All notable changes to this project will be documented in this file.
 * **Guiller Angelo** - Drafted the final README.md deployment instructions and prerequisites  
 * **Groupmate 2 Name** - Wrote the script for the video presentation conclusion and live demo segment
 
-## **[2026-05-13] - Fixed Bicep validation error**
+## **[2026-05-13, 2:15PM] - Fixed Bicep validation error**
 
 ### **Fixed**
 
