@@ -35,6 +35,14 @@ All notable changes to this project will be documented in this file.
 ### **Added**
 
 * **[HERMOSO]** - Deployed the baseline Python Flask application to the App Service using Azure CLI ```az webapp up```
+
+## **[2026-05-13, 8:20PM] - Deployment**
+
+### **Added**
+
+* **[QUITE]** - Wrap content block in a flex container
+* **[QUITE]** - Add flexbox layout to main container and footer
+* **[QUITE]** - Update academic year text in index.html
 ---
 ---
 # **Sample lang tong sa baba, copy paste na lang kayo**
