@@ -4,10 +4,6 @@ All notable changes to this project will be documented in this file.
 
 ## **[2026-05-13, 5:00AM] - Unreleased**
 
-* [Rona Mae Quite] - Designed and styled the CS Department Portal UI with external CSS and JavaScript files
-* [Rona Mae Quite] - Created static/ folder with style.css, script.js, and ccs.png logo
-* [Rona Mae Quite] - Updated templates/index.html with linked stylesheet and navigation script
-
 ### **Added**
 
 * **[HERMOSO]** - Drafted the final README.md deployment instructions and prerequisites  
