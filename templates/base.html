@@ -10,6 +10,9 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
 </head>
 <body>
-    {% block content %}{% endblock %}
+    <div style="display: flex; flex-direction: column; min-height: 100vh;">
+        <div style="height: 1.5rem; background: var(--cream);"></div>
+        {% block content %}{% endblock %}
+    </div>
 </body>
 </html>
