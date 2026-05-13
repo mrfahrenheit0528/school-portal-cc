@@ -15,7 +15,7 @@ param sqlAdminPassword string
 // 1. STORAGE ACCOUNT (Optimization 1: Fault Tolerance via ZRS)
 // ---------------------------------------------------------------------------
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
-  name: 'stschoolportal${appNameSuffix}'
+  name: 'stportal${appNameSuffix}' // Shortened prefix to stay under 24 character limit
   location: location
   sku: {
     name: 'Standard_ZRS' // Cloud Optimization: Zone-Redundant Storage
