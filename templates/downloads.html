@@ -9,7 +9,7 @@
             {% for file in files %}
                 <li>
                     {{ file.name }} ({{ file.size }}) 
-                    <a href="#">[Download]</a>
+                    <a href="{{ url_for('download_file', filename=file.name) }}">[Download]</a>
                 </li>
             {% endfor %}
         </ul>
