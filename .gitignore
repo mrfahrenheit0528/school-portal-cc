@@ -1,2 +1,3 @@
 .venv/
 .azure-config/
+.azure/
