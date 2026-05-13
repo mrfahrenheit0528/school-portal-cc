@@ -1,30 +1,13 @@
 {% extends 'base.html' %}
 
 {% block content %}
-    <h1>Welcome to the Computer Science Department Portal</h1>
-    <p>This is the central hub for all CSEC students and faculty.</p>
-    <p>Please use the navigation menu to view recent announcements, upcoming events, and download necessary department files.</p>
-{% endblock %}
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>School Portal — CS Department</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css" />
-</head>
-<body>
 
   <!-- NAVBAR -->
   <nav class="navbar">
     <a class="navbar-brand" href="#" onclick="showPage('home')">
       <div class="navbar-logo">CS</div>
       <div class="navbar-brand-text">
-        <div class="navbar-brand-title">Computer Science Dept.</div>
+        <div class="navbar-brand-title">Bachelor of Science in Computer Science</div>
         <div class="navbar-brand-sub">CSEC Student &amp; Faculty Portal</div>
       </div>
     </a>
@@ -171,6 +154,5 @@
     <span>CS Department Portal</span> &nbsp;·&nbsp; CSEC Academic Year 2025–2026 &nbsp;·&nbsp; All rights reserved
   </footer>
 
-  <script src="script.js"></script>
-</body>
-</html>
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+{% endblock %}
