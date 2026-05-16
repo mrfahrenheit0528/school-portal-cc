@@ -1,12 +1,12 @@
-# CSEC Student & Faculty Portal 🎓
+# CSEC Student & Faculty Portal
 
 The **CSEC Student & Faculty Portal** is a centralized platform designed for the Computer Science Department to streamline communication and resource sharing. It provides students and faculty with real-time access to announcements, academic schedules, and essential department documents.
 
-## 🚀 Live Demo
+## Live Demo
 **Demo URL:** [http://csec3portal-webapp-sfajbuykzajcu.azurewebsites.net](http://csec3portal-webapp-sfajbuykzajcu.azurewebsites.net)
 
-## 🎥 Project Video
-**Demo Video:** [Click here to watch on YouTube (Unlisted)](https://youtu.be/INSERT_YOUR_VIDEO_ID_HERE)
+## Project Video
+**Demo Video:** [Click here to watch on YouTube (Unlisted)](https://youtu.be/F3kuDKD4OtM)
 
 ## ✨ Key Features
 - **Dynamic Announcements**: Real-time updates with data-driven badges (Urgent, Event, Notice).
@@ -15,17 +15,16 @@ The **CSEC Student & Faculty Portal** is a centralized platform designed for the
 - **Single-Page Application (SPA)**: Smooth, animated transitions between sections with persistent URL routing.
 - **Responsive Design**: Premium aesthetics tailored for both desktop and mobile users.
 
-## 🛠️ Technology Stack
+## Technology Stack
 - **Backend**: Python (Flask)
 - **Database**: Azure SQL Database
 - **Storage**: Azure Blob Storage
 - **Infrastructure**: Azure App Service (Linux)
 - **Deployment**: Azure CLI & Bicep (IaC)
 
-## 👥 The Team
-- **[Full Name 1]** - Project Lead / Backend
-- **[Full Name 2]** - Frontend / UI Design
-- **[Full Name 3]** - Cloud Architect / DevOps
+## The Team
+- **Guiller Angelo Hermoso** 
+- **Rona Mae Quite** 
+- **Mary Joyce Moico** 
 
 ---
-© 2026 CSEC Computer Science Department. All rights reserved.

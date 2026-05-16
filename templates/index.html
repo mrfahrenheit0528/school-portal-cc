@@ -8,7 +8,7 @@
     <img src="{{ url_for('static', filename='ccs.png') }}" class="navbar-logo" alt="CCS Logo" />
     <div class="navbar-brand-text">
       <div class="navbar-brand-title">Bachelor of Science in Computer Science</div>
-      <div class="navbar-brand-sub">CSEC Student &amp; Faculty Portal</div>
+      <div class="navbar-brand-sub">CS Student &amp; Faculty Portal</div>
     </div>
   </a>
   <ul class="nav-links">
@@ -23,7 +23,7 @@
   <div class="hero">
     <div class="hero-tag">AY 2025 – 2026</div>
     <h1>Welcome to the <span>Computer Science</span> Department Portal</h1>
-    <p class="hero-desc">The central hub for all CSEC students and faculty — announcements, events, and department
+    <p class="hero-desc">The central hub for all CS students and faculty — announcements, events, and department
       resources in one place.</p>
     <div class="hero-cta-row">
       <a href="#announcements" class="btn-primary" onclick="showPage('announcements')">View Announcements</a>
@@ -54,7 +54,7 @@
       <a href="#home" class="quick-card" onclick="showPage('home')">
         <div class="quick-icon">📋</div>
         <h3>Department Info</h3>
-        <p>Learn more about the CSEC program, faculty, and academic offerings.</p>
+        <p>Learn more about the CS programs, faculty, and academic offerings.</p>
       </a>
     </div>
   </div>
@@ -77,7 +77,8 @@
       <div class="announcement-card {{ ann.category }}">
         <div class="ann-meta">
           <span class="ann-badge badge-{{ ann.category }}">
-            {% if ann.category == 'urgent' %}🔴 Urgent{% elif ann.category == 'event' %}📅 Event{% else %}📋 Notice{% endif %}
+            {% if ann.category == 'urgent' %}🔴 Urgent{% elif ann.category == 'event' %}📅 Event{% else %}📋 Notice{%
+            endif %}
           </span>
           <span class="ann-date">Set on: {{ ann.date }}</span>
         </div>
