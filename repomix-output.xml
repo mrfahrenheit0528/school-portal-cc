@@ -1,0 +1,1843 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+.gitignore
+app.py
+CHANGELOG.md
+deployment/main.bicep
+deployment/README.md
+diagram/architecture.png
+README.md
+report/cost-estimate.md
+requirements.txt
+static/ccs.png
+static/script.js
+static/style.css
+templates/admin.html
+templates/base.html
+templates/index.html
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="deployment/main.bicep">
+@description('The location for all resources.')
+param location string = resourceGroup().location
+
+@description('The primary prefix for all resource names to ensure uniqueness.')
+param projectPrefix string = 'csec3portal'
+
+@description('The administrator username for the SQL Server.')
+param sqlAdministratorLogin string
+
+@description('The administrator password for the SQL Server. Must meet Azure complexity requirements.')
+@secure()
+param sqlAdministratorLoginPassword string
+
+var storageAccountName = '${projectPrefix}store${uniqueString(resourceGroup().id)}'
+var appServicePlanName = '${projectPrefix}-asp'
+var webAppName = '${projectPrefix}-webapp-${uniqueString(resourceGroup().id)}'
+var sqlServerName = '${projectPrefix}-sqlserver-${uniqueString(resourceGroup().id)}'
+var sqlDatabaseName = '${projectPrefix}-sqldb'
+var autoscaleName = '${projectPrefix}-autoscale'
+
+// ==========================================
+// 1. Storage Account (Optimization: Fault Tolerance via ZRS)
+// ==========================================
+resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
+  name: substring(storageAccountName, 0, min(length(storageAccountName), 24))
+  location: location
+  sku: {
+    name: 'Standard_ZRS'
+  }
+  kind: 'StorageV2'
+  properties: {
+    accessTier: 'Hot'
+    minimumTlsVersion: 'TLS1_2'
+    supportsHttpsTrafficOnly: true
+    allowBlobPublicAccess: false // Explicitly disabled to comply with strict tenant policies
+  }
+}
+
+resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2023-01-01' = {
+  parent: storageAccount
+  name: 'default'
+}
+
+resource container 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-01-01' = {
+  parent: blobService
+  name: 'downloads'
+  properties: {
+    publicAccess: 'None' // Container is now strictly private
+  }
+}
+
+// ==========================================
+// 2. Azure SQL Database (Baseline Data Resource)
+// ==========================================
+resource sqlServer 'Microsoft.Sql/servers@2023-05-01-preview' = {
+  name: sqlServerName
+  location: location
+  properties: {
+    administratorLogin: sqlAdministratorLogin
+    administratorLoginPassword: sqlAdministratorLoginPassword
+    version: '12.0'
+  }
+}
+
+resource sqlFirewall 'Microsoft.Sql/servers/firewallRules@2023-05-01-preview' = {
+  parent: sqlServer
+  name: 'AllowAllWindowsAzureIps'
+  properties: {
+    startIpAddress: '0.0.0.0'
+    endIpAddress: '0.0.0.0'
+  }
+}
+
+resource sqlDatabase 'Microsoft.Sql/servers/databases@2023-05-01-preview' = {
+  parent: sqlServer
+  name: sqlDatabaseName
+  location: location
+  sku: {
+    name: 'Basic'
+    tier: 'Basic'
+    capacity: 5
+  }
+}
+
+// ==========================================
+// 3. App Service Plan & Web App (Baseline Compute Resource)
+// ==========================================
+resource appServicePlan 'Microsoft.Web/serverfarms@2022-09-01' = {
+  name: appServicePlanName
+  location: location
+  sku: {
+    name: 'S1'
+    tier: 'Standard'
+    capacity: 2
+  }
+  properties: {
+    reserved: true
+  }
+}
+
+resource webApp 'Microsoft.Web/sites@2022-09-01' = {
+  name: webAppName
+  location: location
+  properties: {
+    serverFarmId: appServicePlan.id
+    siteConfig: {
+      linuxFxVersion: 'PYTHON|3.11'
+      alwaysOn: true
+      appSettings: [
+        {
+          name: 'SCM_DO_BUILD_DURING_DEPLOYMENT'
+          value: 'true'
+        }
+        {
+          name: 'SQL_SERVER'
+          value: sqlServer.properties.fullyQualifiedDomainName
+        }
+        {
+          name: 'SQL_DATABASE'
+          value: sqlDatabaseName
+        }
+        {
+          name: 'SQL_USERNAME'
+          value: sqlAdministratorLogin
+        }
+        {
+          name: 'SQL_PASSWORD'
+          value: sqlAdministratorLoginPassword
+        }
+        {
+          name: 'STORAGE_CONNECTION_STRING'
+          value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};AccountKey=${listKeys(storageAccount.id, storageAccount.apiVersion).keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
+        }
+        {
+          name: 'STORAGE_CONTAINER_NAME'
+          value: 'downloads'
+        }
+      ]
+    }
+    httpsOnly: true
+  }
+}
+
+// ==========================================
+// 4. Autoscale Settings (Optimization: Scalability)
+// ==========================================
+resource autoscaleSettings 'Microsoft.Insights/autoscalesettings@2022-10-01' = {
+  name: autoscaleName
+  location: location
+  properties: {
+    enabled: true
+    targetResourceUri: appServicePlan.id
+    profiles: [
+      {
+        name: 'DefaultProfile'
+        capacity: {
+          minimum: '2'
+          maximum: '5'
+          default: '2'
+        }
+        rules: [
+          {
+            metricTrigger: {
+              metricName: 'CpuPercentage'
+              metricResourceUri: appServicePlan.id
+              timeGrain: 'PT1M'
+              statistic: 'Average'
+              timeWindow: 'PT5M'
+              timeAggregation: 'Average'
+              operator: 'GreaterThan'
+              threshold: 70
+            }
+            scaleAction: {
+              direction: 'Increase'
+              type: 'ChangeCount'
+              value: '1'
+              cooldown: 'PT5M'
+            }
+          }
+          {
+            metricTrigger: {
+              metricName: 'CpuPercentage'
+              metricResourceUri: appServicePlan.id
+              timeGrain: 'PT1M'
+              statistic: 'Average'
+              timeWindow: 'PT5M'
+              timeAggregation: 'Average'
+              operator: 'LessThan'
+              threshold: 30
+            }
+            scaleAction: {
+              direction: 'Decrease'
+              type: 'ChangeCount'
+              value: '1'
+              cooldown: 'PT5M'
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
+
+output webAppUrl string = webApp.properties.defaultHostName
+output sqlServerFqdn string = sqlServer.properties.fullyQualifiedDomainName
+output storageAccountNameOut string = storageAccount.name
+</file>
+
+<file path="deployment/README.md">
+# Deployment Guide: CSEC Student & Faculty Portal 🚀
+
+This guide provides step-by-step instructions for deploying the CSEC Portal to Microsoft Azure. The deployment uses Infrastructure-as-Code (Bicep) to ensure a consistent and secure environment.
+
+## 📋 Prerequisites
+- **Azure Subscription**: A valid account with permission to create resources.
+- **Azure CLI**: [Installed and authenticated](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) (`az login`).
+- **Python 3.10+**: For local testing and development.
+
+---
+
+## 🛠️ Step 1: Infrastructure Deployment (Bicep)
+The system uses a Bicep template to provision the App Service, SQL Server, and Storage Account automatically.
+
+1. Open your terminal in the project root.
+2. Create a resource group:
+   ```bash
+   az group create --name rg-csec3-final --location eastasia
+   ```
+3. Deploy the infrastructure (replace placeholders for SQL credentials):
+   ```bash
+   az deployment group create \
+     --resource-group rg-csec3-final \
+     --template-file ./deployment/main.bicep \
+     --parameters sqlAdministratorLogin='YOUR_ADMIN_USER' \
+     --parameters sqlAdministratorLoginPassword='YOUR_SECURE_PASSWORD'
+   ```
+   > [!IMPORTANT]
+   > Ensure your password meets Azure complexity requirements (uppercase, lowercase, number, symbol).
+
+---
+
+## 🛠️ Step 2: Configure Azure Storage
+The application expects a private container named `downloads` to store documents.
+
+1. The Bicep template creates this container automatically.
+2. You can upload initial documents via the Azure Portal or the Admin Dashboard at `/admin` after deployment.
+
+---
+
+## 🛠️ Step 3: Application Deployment
+Once the infrastructure is ready, deploy the Flask application code.
+
+1. Run the deployment command:
+   ```bash
+   az webapp up --name csec3portal-webapp-sfajbuykzajcu --resource-group rg-csec3-final
+   ```
+2. Azure will automatically detect the Python environment, install dependencies from `requirements.txt`, and start the web server.
+
+---
+
+## 🧪 Step 4: Verification
+1. Navigate to your Web App URL (provided by the `az webapp up` output).
+2. Visit the `/health` endpoint to verify database and storage connectivity:
+   `http://<your-app-name>.azurewebsites.net/health`
+3. If successful, you should see a JSON response confirming "connected" status for both services.
+
+---
+
+## 🔐 Security Notes
+- **No Hardcoded Passwords**: All credentials (SQL Connection String, Storage Keys) are injected as **Environment Variables** in the Azure App Service.
+- **HTTPS Only**: The Web App is configured to redirect all traffic to HTTPS.
+- **Private Storage**: Blob storage public access is explicitly disabled.
+
+---
+© 2026 CSEC Computer Science Department. All rights reserved.
+</file>
+
+<file path="report/cost-estimate.md">
+
+</file>
+
+<file path="templates/admin.html">
+{% extends 'base.html' %}
+
+{% block content %}
+<nav class="navbar">
+    <a class="navbar-brand" href="{{ url_for('index') }}">
+        <img src="{{ url_for('static', filename='ccs.png') }}" class="navbar-logo" alt="CCS Logo" />
+        <div class="navbar-brand-text">
+            <div class="navbar-brand-title">Bachelor of Science in Computer Science</div>
+            <div class="navbar-brand-sub">Admin Dashboard</div>
+        </div>
+    </a>
+    <ul class="nav-links">
+        <li><a href="{{ url_for('index') }}">🔙 Back to Portal</a></li>
+    </ul>
+</nav>
+
+<div class="section">
+    <div class="section-heading">
+        <div class="section-icon">⚙️</div>
+        <div>
+            <h2>Department Administration</h2>
+            <p>Manage portal content and resources</p>
+        </div>
+    </div>
+
+    <div class="downloads-grid" style="grid-template-columns: 1fr 1fr; gap: 2rem;">
+
+        <div class="file-card">
+            <h3 style="margin-bottom: 1rem; color: var(--navy);">Post New Announcement</h3>
+            <form action="{{ url_for('post_announcement') }}" method="POST"
+                style="display: flex; flex-direction: column; gap: 1rem;">
+                <div>
+                    <label style="font-size: 14px; font-weight: 500;">Title:</label>
+                    <input type="text" name="title" required
+                        style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius-sm);">
+                </div>
+                <div>
+                    <label style="font-size: 14px; font-weight: 500;">Date:</label>
+                    <input type="date" name="date_posted" required
+                        style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius-sm);">
+                </div>
+                <div>
+                    <label style="font-size: 14px; font-weight: 500;">Content:</label>
+                    <textarea name="content" rows="4" required
+                        style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius-sm);"></textarea>
+                </div>
+                <div>
+                    <label style="font-size: 14px; font-weight: 500;">Category:</label>
+                    <select name="category"
+                        style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius-sm);">
+                        <option value="notice">📋 Notice</option>
+                        <option value="event">📅 Event</option>
+                        <option value="urgent">🔴 Urgent</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn-primary" style="margin-top: 0.5rem;">Post to Portal</button>
+            </form>
+        </div>
+
+        <div class="file-card">
+            <h3 style="margin-bottom: 1rem; color: var(--navy);">Upload Document</h3>
+            <form action="{{ url_for('upload_file') }}" method="POST" enctype="multipart/form-data"
+                style="display: flex; flex-direction: column; gap: 1rem;">
+                <div>
+                    <label style="font-size: 14px; font-weight: 500;">Select File:</label>
+                    <input type="file" name="file" required
+                        style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius-sm); margin-top: 0.5rem;">
+                </div>
+                <button type="submit" class="btn-primary" style="margin-top: auto;">Upload to Storage</button>
+            </form>
+        </div>
+
+        <div class="file-card" style="grid-column: 1 / -1;">
+            <h3 style="margin-bottom: 1rem; color: var(--navy);">Manage Announcements</h3>
+            <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                {% if announcements %}
+                {% for ann in announcements %}
+                <div
+                    style="border: 1px solid var(--border); padding: 1.25rem; border-radius: var(--radius-sm); background: var(--cream);">
+
+                    <form action="{{ url_for('edit_announcement', id=ann.id) }}" method="POST"
+                        style="display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 0.75rem;">
+                        <input type="text" name="title" value="{{ ann.title }}" required
+                            style="padding: 0.5rem; border: 1px solid var(--border); font-weight: bold;">
+                        <input type="date" name="date_posted" value="{{ ann.date }}" required
+                            style="padding: 0.5rem; border: 1px solid var(--border);">
+                        <textarea name="content" rows="3" required
+                            style="padding: 0.5rem; border: 1px solid var(--border);">{{ ann.content }}</textarea>
+                        <select name="category"
+                            style="padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius-sm);">
+                            <option value="notice" {% if ann.category == 'notice' %}selected{% endif %}>📋 Notice</option>
+                            <option value="event" {% if ann.category == 'event' %}selected{% endif %}>📅 Event</option>
+                            <option value="urgent" {% if ann.category == 'urgent' %}selected{% endif %}>🔴 Urgent</option>
+                        </select>
+                        <button type="submit" class="btn-primary" style="padding: 0.5rem; font-size: 13px;">Save
+                            Edits</button>
+                    </form>
+
+                    <form action="{{ url_for('delete_announcement', id=ann.id) }}" method="POST"
+                        onsubmit="return confirm('Are you sure you want to permanently delete this announcement?');">
+                        <button type="submit"
+                            style="width: 100%; background: transparent; border: 1px solid #c0392b; color: #c0392b; padding: 0.5rem; border-radius: var(--radius-sm); cursor: pointer; font-weight: 500; font-size: 13px;">Delete
+                            Announcement</button>
+                    </form>
+                </div>
+                {% endfor %}
+                {% else %}
+                <p style="font-size: 14px; color: var(--muted);">No announcements available to manage.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="file-card" style="grid-column: 1 / -1;">
+            <h3 style="margin-bottom: 1rem; color: var(--navy);">Manage Uploaded Files</h3>
+            {% if files %}
+            <ul style="list-style: none; display: flex; flex-direction: column; gap: 0.75rem;">
+                {% for file in files %}
+                <li
+                    style="display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border); padding: 0.75rem 1rem; border-radius: var(--radius-sm); background: var(--cream);">
+                    <span style="font-size: 14px; font-weight: 500;">{{ file.name }}</span>
+
+                    <form action="{{ url_for('delete_file', filename=file.name) }}" method="POST"
+                        onsubmit="return confirm('Delete this file permanently from Azure Storage?');"
+                        style="margin: 0;">
+                        <button type="submit"
+                            style="background: none; border: none; color: #c0392b; cursor: pointer; text-decoration: underline; font-size: 13px; font-weight: 500;">Delete</button>
+                    </form>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p style="font-size: 14px; color: var(--muted);">No files available to manage.</p>
+            {% endif %}
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+</file>
+
+<file path="static/script.js">
+// ── Page Switching ──
+function showPage(page, updateHash = true) {
+  const targetPage = document.getElementById('page-' + page);
+  const targetNav = document.getElementById('nav-' + page);
+
+  if (!targetPage) return false;
+
+  // Update UI
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
+  
+  targetPage.classList.add('active');
+  if (targetNav) targetNav.classList.add('active');
+
+  // Update URL Hash if requested
+  if (updateHash) {
+    window.location.hash = page;
+  }
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  // Re-trigger scroll reveal for the newly active page
+  requestAnimationFrame(() => {
+    initScrollReveal();
+    staggerCards(targetPage);
+  });
+
+  return false;
+}
+
+// ── Scroll Reveal (IntersectionObserver) ──
+function initScrollReveal() {
+  const revealElements = document.querySelectorAll('.reveal:not(.visible)');
+  if (!revealElements.length) return;
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+  revealElements.forEach(el => observer.observe(el));
+}
+
+// ── Staggered Card Entrance ──
+function staggerCards(container) {
+  if (!container) return;
+  const cards = container.querySelectorAll(
+    '.announcement-card, .file-card, .quick-card'
+  );
+  cards.forEach((card, i) => {
+    card.style.opacity = '0';
+    card.style.transform = 'translateY(20px)';
+    card.style.transition = 'none';
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        card.style.transition = `opacity 0.5s ease ${i * 0.08}s, transform 0.5s ease ${i * 0.08}s`;
+        card.style.opacity = '1';
+        card.style.transform = 'translateY(0)';
+      });
+    });
+  });
+}
+
+// ── Routing Logic ──
+function handleRouting() {
+  const hash = window.location.hash.replace('#', '');
+  if (hash) {
+    showPage(hash, false); // Don't update hash again to avoid loops
+  } else {
+    showPage('home', false);
+  }
+}
+
+// ── Init on Load ──
+document.addEventListener('DOMContentLoaded', () => {
+  // Mark section headings for scroll reveal
+  document.querySelectorAll('.section-heading').forEach(el => {
+    el.classList.add('reveal');
+  });
+
+  initScrollReveal();
+
+  // Listen for hash changes (back/forward buttons)
+  window.addEventListener('hashchange', handleRouting);
+
+  // Initial routing check
+  handleRouting();
+});
+</file>
+
+<file path="requirements.txt">
+Flask==3.0.3
+pyodbc==5.1.0
+azure-storage-blob==12.19.1
+python-dotenv==1.0.1
+</file>
+
+<file path="static/style.css">
+/* ── RESET & ROOT ── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --navy:     #0e1b3d;
+  --navy-m:   #1a2f5e;
+  --navy-l:   #26437f;
+  --gold:     #c9993a;
+  --gold-l:   #e8ba60;
+  --gold-ll:  #f5dda0;
+  --cream:    #faf7f0;
+  --cream-d:  #f0ead8;
+  --text:     #1a1612;
+  --muted:    #5a5348;
+  --border:   rgba(14, 27, 61, 0.12);
+  --white:    #ffffff;
+  --radius:   12px;
+  --radius-sm: 6px;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--cream);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.6;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── ANIMATIONS ── */
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(201, 153, 58, 0.25); }
+  50%      { box-shadow: 0 0 20px 4px rgba(201, 153, 58, 0.15); }
+}
+
+/* Scroll-reveal base class */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── NAVBAR ── */
+.navbar {
+  background: var(--navy);
+  padding: 0 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 20px rgba(14, 27, 61, 0.35);
+  animation: fadeInDown 0.5s ease-out;
+}
+
+.navbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 1rem 0;
+  text-decoration: none;
+}
+
+.navbar-logo {
+  width: 40px;
+  height: 40px;
+  background: var(--gold);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Playfair Display', serif;
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--navy);
+  flex-shrink: 0;
+  transition: transform 0.3s ease;
+}
+
+.navbar-brand:hover .navbar-logo {
+  transform: rotate(-6deg) scale(1.08);
+}
+
+.navbar-brand-text {
+  line-height: 1.2;
+}
+
+.navbar-brand-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--white);
+  letter-spacing: 0.02em;
+}
+
+.navbar-brand-sub {
+  font-size: 11px;
+  color: var(--gold-l);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 300;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  list-style: none;
+}
+
+.nav-links li {
+  animation: fadeIn 0.5s ease-out both;
+}
+
+.nav-links li:nth-child(1) { animation-delay: 0.15s; }
+.nav-links li:nth-child(2) { animation-delay: 0.25s; }
+.nav-links li:nth-child(3) { animation-delay: 0.35s; }
+
+.nav-links a {
+  text-decoration: none;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 13.5px;
+  font-weight: 400;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-sm);
+  letter-spacing: 0.01em;
+  transition: background 0.25s ease, color 0.25s ease, transform 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+.nav-links a::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  width: 0;
+  height: 2px;
+  background: var(--gold-l);
+  border-radius: 2px;
+  transition: width 0.3s ease, left 0.3s ease;
+}
+
+.nav-links a:hover::after,
+.nav-links a.active::after {
+  width: 60%;
+  left: 20%;
+}
+
+.nav-links a:hover,
+.nav-links a.active {
+  background: rgba(201, 153, 58, 0.15);
+  color: var(--gold-l);
+}
+
+/* ── HERO ── */
+.hero {
+  background: linear-gradient(135deg, var(--navy) 0%, var(--navy-m) 60%, var(--navy-l) 100%);
+  padding: 5rem 2.5rem 4rem;
+  position: relative;
+  overflow: hidden;
+  text-align: center;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 15% 50%, rgba(201, 153, 58, 0.08) 0%, transparent 55%),
+    radial-gradient(circle at 85% 20%, rgba(201, 153, 58, 0.06) 0%, transparent 50%);
+}
+
+.hero-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(201, 153, 58, 0.15);
+  border: 1px solid rgba(201, 153, 58, 0.3);
+  color: var(--gold-l);
+  font-size: 11.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 500;
+  padding: 5px 14px;
+  border-radius: 50px;
+  margin-bottom: 1.5rem;
+  position: relative;
+  animation: scaleIn 0.6s ease-out 0.2s both;
+}
+
+.hero h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  font-weight: 700;
+  color: var(--white);
+  line-height: 1.15;
+  max-width: 640px;
+  margin: 0 auto 1.25rem;
+  position: relative;
+  animation: fadeInUp 0.7s ease-out 0.35s both;
+}
+
+.hero h1 span {
+  color: var(--gold-l);
+}
+
+.hero-desc {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.65);
+  max-width: 520px;
+  margin: 0 auto 2.5rem;
+  line-height: 1.75;
+  font-weight: 300;
+  position: relative;
+  animation: fadeInUp 0.7s ease-out 0.5s both;
+}
+
+.hero-cta-row {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  position: relative;
+  animation: fadeInUp 0.7s ease-out 0.65s both;
+}
+
+/* ── BUTTONS ── */
+.btn-primary {
+  background: var(--gold);
+  color: var(--navy);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 0.7rem 1.6rem;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  letter-spacing: 0.01em;
+  transition: background 0.25s ease, transform 0.2s ease, box-shadow 0.25s ease;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-primary:hover {
+  background: var(--gold-l);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(201, 153, 58, 0.35);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.btn-outline {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+  font-weight: 400;
+  padding: 0.7rem 1.6rem;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  letter-spacing: 0.01em;
+  transition: border-color 0.25s ease, color 0.25s ease, background 0.25s ease, transform 0.2s ease;
+}
+
+.btn-outline:hover {
+  border-color: var(--gold-l);
+  color: var(--gold-l);
+  background: rgba(201, 153, 58, 0.08);
+  transform: translateY(-2px);
+}
+
+/* ── PAGE SWITCHING ── */
+.page {
+  display: none;
+}
+
+.page.active {
+  display: block;
+  animation: fadeIn 0.4s ease-out;
+}
+
+/* ── SECTION ── */
+.section {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 3rem 2rem 4rem;
+}
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 2.5rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1.5px solid var(--cream-d);
+}
+
+.section-icon {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  background: var(--navy);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  transition: transform 0.3s ease;
+}
+
+.section-heading:hover .section-icon {
+  transform: scale(1.1) rotate(-4deg);
+}
+
+.section-heading h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.section-heading p {
+  font-size: 13.5px;
+  color: var(--muted);
+  margin-top: 2px;
+  font-weight: 300;
+}
+
+/* ── ANNOUNCEMENTS ── */
+.announcement-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.announcement-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem 1.75rem;
+  border-left: 4px solid var(--navy);
+  transition: box-shadow 0.3s ease, transform 0.25s ease;
+  position: relative;
+}
+
+.announcement-card:hover {
+  box-shadow: 0 8px 32px rgba(14, 27, 61, 0.12);
+  transform: translateY(-3px);
+}
+
+.announcement-card.urgent {
+  border-left-color: #c0392b;
+}
+
+.announcement-card.event {
+  border-left-color: var(--gold);
+}
+
+.announcement-card.notice {
+  border-left-color: var(--navy-l);
+}
+
+.ann-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.ann-badge {
+  font-size: 10.5px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 3px 10px;
+  border-radius: 50px;
+  transition: transform 0.2s ease;
+}
+
+.ann-badge:hover {
+  transform: scale(1.05);
+}
+
+.badge-announcement,
+.badge-notice {
+  background: rgba(14, 27, 61, 0.08);
+  color: var(--navy-l);
+}
+
+.badge-event {
+  background: rgba(201, 153, 58, 0.12);
+  color: #8a6520;
+}
+
+.badge-urgent {
+  background: rgba(192, 57, 43, 0.1);
+  color: #c0392b;
+}
+
+.ann-date {
+  font-size: 12.5px;
+  color: var(--muted);
+  font-weight: 300;
+}
+
+.ann-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--navy);
+  margin-bottom: 0.5rem;
+  line-height: 1.3;
+}
+
+.ann-body {
+  font-size: 14.5px;
+  color: var(--muted);
+  line-height: 1.7;
+  font-weight: 300;
+}
+
+/* ── DOWNLOADS ── */
+.downloads-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1.25rem;
+}
+
+.file-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.4rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  transition: box-shadow 0.3s ease, transform 0.25s ease;
+}
+
+.file-card:hover {
+  box-shadow: 0 8px 32px rgba(14, 27, 61, 0.12);
+  transform: translateY(-3px);
+}
+
+.file-icon-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.file-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+  transition: transform 0.3s ease;
+}
+
+.file-card:hover .file-icon {
+  transform: scale(1.1);
+}
+
+.icon-pdf {
+  background: rgba(192, 57, 43, 0.1);
+}
+
+.icon-docx {
+  background: rgba(14, 27, 61, 0.08);
+}
+
+.file-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.file-name {
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--navy);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-size {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 300;
+  margin-top: 2px;
+}
+
+.download-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  background: var(--navy);
+  color: var(--white);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 0.55rem 1rem;
+  border-radius: var(--radius-sm);
+  letter-spacing: 0.01em;
+  transition: background 0.25s ease, transform 0.2s ease, box-shadow 0.25s ease;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+}
+
+.download-btn:hover {
+  background: var(--navy-l);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(14, 27, 61, 0.2);
+}
+
+/* ── HOME QUICK LINKS ── */
+.quick-links {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.25rem;
+  margin-top: 2rem;
+}
+
+.quick-card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.75rem 1.5rem;
+  text-align: center;
+  cursor: pointer;
+  text-decoration: none;
+  transition: box-shadow 0.3s ease, transform 0.25s ease, border-color 0.3s ease;
+  display: block;
+  color: inherit;
+}
+
+.quick-card:hover {
+  box-shadow: 0 10px 40px rgba(14, 27, 61, 0.14);
+  transform: translateY(-4px);
+  border-color: var(--gold);
+}
+
+.quick-icon {
+  width: 52px;
+  height: 52px;
+  background: var(--navy);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  margin: 0 auto 1rem;
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.3s ease;
+}
+
+.quick-card:hover .quick-icon {
+  transform: scale(1.15) rotate(-5deg);
+  background: var(--navy-m);
+}
+
+.quick-card h3 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--navy);
+  margin-bottom: 0.4rem;
+}
+
+.quick-card p {
+  font-size: 13.5px;
+  color: var(--muted);
+  font-weight: 300;
+  line-height: 1.55;
+}
+
+/* ── FOOTER ── */
+footer {
+  background: var(--navy);
+  color: rgba(255, 255, 255, 0.45);
+  text-align: center;
+  font-size: 12.5px;
+  padding: 1.5rem 2rem;
+  font-weight: 300;
+  letter-spacing: 0.02em;
+  margin-top: auto;
+}
+
+footer span {
+  color: var(--gold-l);
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 600px) {
+  .navbar {
+    padding: 0 1.2rem;
+  }
+
+  .hero {
+    padding: 3.5rem 1.5rem 3rem;
+  }
+
+  .section {
+    padding: 2rem 1.2rem 3rem;
+  }
+
+  .nav-links a {
+    font-size: 12px;
+    padding: 0.5rem 0.7rem;
+  }
+}
+</file>
+
+<file path=".gitignore">
+.venv/
+.azure-config/
+.azure/
+settings.json
+# repomix-output.xml
+</file>
+
+<file path="README.md">
+# CSEC Student & Faculty Portal 🎓
+
+The **CSEC Student & Faculty Portal** is a centralized platform designed for the Computer Science Department to streamline communication and resource sharing. It provides students and faculty with real-time access to announcements, academic schedules, and essential department documents.
+
+## 🚀 Live Demo
+**Demo URL:** [http://csec3portal-webapp-sfajbuykzajcu.azurewebsites.net](http://csec3portal-webapp-sfajbuykzajcu.azurewebsites.net)
+
+## 🎥 Project Video
+**Demo Video:** [Click here to watch on YouTube (Unlisted)](https://youtu.be/INSERT_YOUR_VIDEO_ID_HERE)
+
+## ✨ Key Features
+- **Dynamic Announcements**: Real-time updates with data-driven badges (Urgent, Event, Notice).
+- **Secure File Downloads**: Access department resources hosted on private Azure Blob Storage.
+- **Admin Dashboard**: Secure management interface for posting announcements and uploading documents.
+- **Single-Page Application (SPA)**: Smooth, animated transitions between sections with persistent URL routing.
+- **Responsive Design**: Premium aesthetics tailored for both desktop and mobile users.
+
+## 🛠️ Technology Stack
+- **Backend**: Python (Flask)
+- **Database**: Azure SQL Database
+- **Storage**: Azure Blob Storage
+- **Infrastructure**: Azure App Service (Linux)
+- **Deployment**: Azure CLI & Bicep (IaC)
+
+## 👥 The Team
+- **[Full Name 1]** - Project Lead / Backend
+- **[Full Name 2]** - Frontend / UI Design
+- **[Full Name 3]** - Cloud Architect / DevOps
+
+---
+© 2026 CSEC Computer Science Department. All rights reserved.
+</file>
+
+<file path="templates/base.html">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>School Portal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+    <div style="display: flex; flex-direction: column; min-height: 100vh;">
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>
+</file>
+
+<file path="app.py">
+import os
+import io
+import pyodbc
+from flask import Flask, render_template, send_file, abort, jsonify, request, redirect, url_for
+from azure.storage.blob import BlobServiceClient
+from werkzeug.utils import secure_filename
+
+app = Flask(__name__)
+
+# --- Environment Variables (Injected by Azure App Service) ---
+SQL_SERVER = os.environ.get('SQL_SERVER')
+SQL_DATABASE = os.environ.get('SQL_DATABASE')
+SQL_USERNAME = os.environ.get('SQL_USERNAME')
+SQL_PASSWORD = os.environ.get('SQL_PASSWORD')
+STORAGE_CONNECTION_STRING = os.environ.get('STORAGE_CONNECTION_STRING')
+STORAGE_CONTAINER_NAME = os.environ.get('STORAGE_CONTAINER_NAME')
+
+# --- Database Helper ---
+def get_db_connection():
+    # ODBC Driver 18 is pre-installed on Azure App Service Linux environments
+    conn_str = f"DRIVER={{ODBC Driver 18 for SQL Server}};SERVER={SQL_SERVER};DATABASE={SQL_DATABASE};UID={SQL_USERNAME};PWD={SQL_PASSWORD}"
+    return pyodbc.connect(conn_str)
+
+def init_db():
+    """Creates the Announcements table and inserts initial data if it does not exist."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Create table if it doesn't exist
+        cursor.execute('''
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Announcements' AND xtype='U')
+            CREATE TABLE Announcements (
+                id INT IDENTITY(1,1) PRIMARY KEY,
+                title NVARCHAR(255) NOT NULL,
+                date_posted DATE NOT NULL,
+                content NVARCHAR(MAX) NOT NULL,
+                category NVARCHAR(20) NOT NULL DEFAULT 'notice'
+            )
+        ''')
+        
+        # Add category column if table already exists but column is missing
+        cursor.execute('''
+            IF NOT EXISTS (
+                SELECT * FROM INFORMATION_SCHEMA.COLUMNS 
+                WHERE TABLE_NAME = 'Announcements' AND COLUMN_NAME = 'category'
+            )
+            ALTER TABLE Announcements ADD category NVARCHAR(20) NOT NULL DEFAULT 'notice'
+        ''')
+        
+        # Seed initial data if table is empty
+        cursor.execute('SELECT COUNT(*) FROM Announcements')
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("INSERT INTO Announcements (title, date_posted, content, category) VALUES ('Final Project Deadlines', '2026-05-15', 'All CSEC 3 final projects must be deployed on Azure and submitted via GitHub.', 'urgent')")
+            cursor.execute("INSERT INTO Announcements (title, date_posted, content, category) VALUES ('Department Town Hall', '2026-05-20', 'Join the faculty for the end-of-semester department meeting.', 'event')")
+            
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Database Initialization Error: {e}")
+
+# Run initialization when the app starts on Azure
+if SQL_SERVER:
+    init_db()
+
+# --- Routes ---
+@app.route('/')
+def index():
+    # 1. Fetch Announcements from Azure SQL
+    announcements_list = []
+    if SQL_SERVER:
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, title, date_posted, content, category FROM Announcements ORDER BY date_posted DESC")
+            for row in cursor.fetchall():
+                announcements_list.append({
+                    "id": row[0],
+                    "title": row[1],
+                    "date": row[2].strftime('%B %d, %Y') if row[2] else '',
+                    "content": row[3],
+                    "category": row[4] if len(row) > 4 else 'notice'
+                })
+            conn.close()
+        except Exception as e:
+            print(f"Database Read Error: {e}")
+
+    # 2. Fetch Files from Azure Blob Storage
+    files_list = []
+    if STORAGE_CONNECTION_STRING:
+        try:
+            blob_service_client = BlobServiceClient.from_connection_string(STORAGE_CONNECTION_STRING)
+            container_client = blob_service_client.get_container_client(STORAGE_CONTAINER_NAME)
+            
+            blob_list = container_client.list_blobs()
+            for blob in blob_list:
+                size_kb = blob.size / 1024
+                size_str = f"{size_kb:.1f} KB" if size_kb < 1024 else f"{size_kb/1024:.1f} MB"
+                files_list.append({"name": blob.name, "size": size_str})
+        except Exception as e:
+            print(f"Storage Read Error: {e}")
+
+    # Render index with live data
+    return render_template('index.html', announcements=announcements_list, files=files_list)
+
+
+
+@app.route('/download/<filename>')
+def download_file(filename):
+    """Securely streams a file from the private Azure Blob Storage container to the user."""
+    if not STORAGE_CONNECTION_STRING:
+        abort(404)
+    try:
+        blob_service_client = BlobServiceClient.from_connection_string(STORAGE_CONNECTION_STRING)
+        blob_client = blob_service_client.get_blob_client(container=STORAGE_CONTAINER_NAME, blob=filename)
+        
+        # Download the blob into memory
+        download_stream = blob_client.download_blob()
+        file_stream = io.BytesIO(download_stream.readall())
+        file_stream.seek(0)
+        
+        return send_file(file_stream, as_attachment=True, download_name=filename)
+    except Exception as e:
+        print(f"File Download Error: {e}")
+        abort(404)
+
+@app.route('/health')
+def health():
+    """Diagnostic endpoint to verify Azure resource connectivity."""
+    status = {"db": "not configured", "storage": "not configured", "blob_count": 0}
+    
+    if SQL_SERVER:
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM Announcements")
+            count = cursor.fetchone()[0]
+            conn.close()
+            status["db"] = f"connected ({count} announcements)"
+        except Exception as e:
+            status["db"] = f"error: {e}"
+    
+    if STORAGE_CONNECTION_STRING:
+        try:
+            blob_service_client = BlobServiceClient.from_connection_string(STORAGE_CONNECTION_STRING)
+            container_client = blob_service_client.get_container_client(STORAGE_CONTAINER_NAME)
+            blobs = list(container_client.list_blobs())
+            status["storage"] = f"connected ({len(blobs)} files)"
+            status["blob_count"] = len(blobs)
+            status["blob_names"] = [b.name for b in blobs]
+        except Exception as e:
+            status["storage"] = f"error: {e}"
+    
+    return jsonify(status)
+
+# --- Admin Routes ---
+@app.route('/admin')
+def admin():
+    """Renders the admin dashboard and fetches existing content for management."""
+    announcements_list = []
+    if SQL_SERVER:
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, title, date_posted, content, category FROM Announcements ORDER BY date_posted DESC")
+            for row in cursor.fetchall():
+                announcements_list.append({
+                    "id": row[0],
+                    "title": row[1],
+                    "date": row[2].strftime('%Y-%m-%d') if row[2] else '',
+                    "content": row[3],
+                    "category": row[4] if len(row) > 4 else 'notice'
+                })
+            conn.close()
+        except Exception as e:
+            print(f"Database Read Error: {e}")
+
+    files_list = []
+    if STORAGE_CONNECTION_STRING:
+        try:
+            blob_service_client = BlobServiceClient.from_connection_string(STORAGE_CONNECTION_STRING)
+            container_client = blob_service_client.get_container_client(STORAGE_CONTAINER_NAME)
+            blob_list = container_client.list_blobs()
+            for blob in blob_list:
+                files_list.append({"name": blob.name})
+        except Exception as e:
+            print(f"Storage Read Error: {e}")
+
+    return render_template('admin.html', announcements=announcements_list, files=files_list)
+
+@app.route('/admin/edit_announcement/<int:id>', methods=['POST'])
+def edit_announcement(id):
+    """Updates an existing announcement in Azure SQL."""
+    title = request.form.get('title')
+    date_posted = request.form.get('date_posted')
+    content = request.form.get('content')
+    category = request.form.get('category', 'notice')
+    
+    if SQL_SERVER and title and date_posted and content:
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE Announcements SET title = ?, date_posted = ?, content = ?, category = ? WHERE id = ?",
+                (title, date_posted, content, category, id)
+            )
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"Database Update Error: {e}")
+            
+    return redirect(url_for('admin'))
+
+@app.route('/admin/delete_announcement/<int:id>', methods=['POST'])
+def delete_announcement(id):
+    """Removes an announcement from Azure SQL."""
+    if SQL_SERVER:
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM Announcements WHERE id = ?", (id,))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"Database Delete Error: {e}")
+            
+    return redirect(url_for('admin'))
+
+@app.route('/admin/delete_file/<filename>', methods=['POST'])
+def delete_file(filename):
+    """Permanently deletes a file from Azure Blob Storage."""
+    if STORAGE_CONNECTION_STRING:
+        try:
+            blob_service_client = BlobServiceClient.from_connection_string(STORAGE_CONNECTION_STRING)
+            blob_client = blob_service_client.get_blob_client(container=STORAGE_CONTAINER_NAME, blob=filename)
+            blob_client.delete_blob()
+        except Exception as e:
+            print(f"File Delete Error: {e}")
+            
+    return redirect(url_for('admin'))
+
+@app.route('/admin/post_announcement', methods=['POST'])
+def post_announcement():
+    """Handles the form submission to insert a new announcement into Azure SQL."""
+    title = request.form.get('title')
+    date_posted = request.form.get('date_posted')
+    content = request.form.get('content')
+    category = request.form.get('category', 'notice')
+    
+    if SQL_SERVER and title and date_posted and content:
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            # Parameterized query to prevent SQL injection
+            cursor.execute(
+                "INSERT INTO Announcements (title, date_posted, content, category) VALUES (?, ?, ?, ?)",
+                (title, date_posted, content, category)
+            )
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"Database Insert Error: {e}")
+            
+    return redirect(url_for('admin'))
+
+@app.route('/admin/upload_file', methods=['POST'])
+def upload_file():
+    """Handles file uploads and pushes them securely to the Azure Blob Storage container."""
+    if 'file' not in request.files:
+        return redirect(request.url)
+        
+    file = request.files['file']
+    if file.filename == '':
+        return redirect(url_for('admin'))
+        
+    if file and STORAGE_CONNECTION_STRING:
+        try:
+            # Secure the filename before saving
+            filename = secure_filename(file.filename)
+            
+            blob_service_client = BlobServiceClient.from_connection_string(STORAGE_CONNECTION_STRING)
+            blob_client = blob_service_client.get_blob_client(container=STORAGE_CONTAINER_NAME, blob=filename)
+            
+            # Upload the file stream directly to Azure
+            blob_client.upload_blob(file.stream, overwrite=True)
+        except Exception as e:
+            print(f"File Upload Error: {e}")
+            
+    return redirect(url_for('admin'))
+
+if __name__ == '__main__':
+    app.run(debug=True, port=5001)
+</file>
+
+<file path="templates/index.html">
+{% extends 'base.html' %}
+
+{% block content %}
+
+<!-- NAVBAR -->
+<nav class="navbar">
+  <a class="navbar-brand" href="#" onclick="showPage('home')">
+    <img src="{{ url_for('static', filename='ccs.png') }}" class="navbar-logo" alt="CCS Logo" />
+    <div class="navbar-brand-text">
+      <div class="navbar-brand-title">Bachelor of Science in Computer Science</div>
+      <div class="navbar-brand-sub">CSEC Student &amp; Faculty Portal</div>
+    </div>
+  </a>
+  <ul class="nav-links">
+    <li><a href="#home" id="nav-home" onclick="showPage('home')" class="active">🏠 Home</a></li>
+    <li><a href="#announcements" id="nav-announcements" onclick="showPage('announcements')">📢 Announcements</a></li>
+    <li><a href="#downloads" id="nav-downloads" onclick="showPage('downloads')">📁 Downloads</a></li>
+  </ul>
+</nav>
+
+<!-- HOME PAGE -->
+<div id="page-home" class="page active">
+  <div class="hero">
+    <div class="hero-tag">AY 2025 – 2026</div>
+    <h1>Welcome to the <span>Computer Science</span> Department Portal</h1>
+    <p class="hero-desc">The central hub for all CSEC students and faculty — announcements, events, and department
+      resources in one place.</p>
+    <div class="hero-cta-row">
+      <a href="#announcements" class="btn-primary" onclick="showPage('announcements')">View Announcements</a>
+      <a href="#downloads" class="btn-outline" onclick="showPage('downloads')">Download Resources</a>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-heading">
+      <div class="section-icon">🧭</div>
+      <div>
+        <h2>Quick Navigation</h2>
+        <p>Browse the portal sections below</p>
+      </div>
+    </div>
+
+    <div class="quick-links">
+      <a href="#announcements" class="quick-card" onclick="showPage('announcements')">
+        <div class="quick-icon">📢</div>
+        <h3>Announcements &amp; Events</h3>
+        <p>Stay updated on deadlines, department meetings, and important notices.</p>
+      </a>
+      <a href="#downloads" class="quick-card" onclick="showPage('downloads')">
+        <div class="quick-icon">📁</div>
+        <h3>File Downloads</h3>
+        <p>Access syllabus files, rubrics, clearance forms, and other department documents.</p>
+      </a>
+      <a href="#home" class="quick-card" onclick="showPage('home')">
+        <div class="quick-icon">📋</div>
+        <h3>Department Info</h3>
+        <p>Learn more about the CSEC program, faculty, and academic offerings.</p>
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- ANNOUNCEMENTS PAGE -->
+<div id="page-announcements" class="page">
+  <div class="section">
+    <div class="section-heading">
+      <div class="section-icon">📢</div>
+      <div>
+        <h2>Announcements &amp; Events</h2>
+        <p>Latest updates from the Computer Science Department</p>
+      </div>
+    </div>
+
+    <div class="announcement-list">
+      {% if announcements %}
+      {% for ann in announcements %}
+      <div class="announcement-card {{ ann.category }}">
+        <div class="ann-meta">
+          <span class="ann-badge badge-{{ ann.category }}">
+            {% if ann.category == 'urgent' %}🔴 Urgent{% elif ann.category == 'event' %}📅 Event{% else %}📋 Notice{% endif %}
+          </span>
+          <span class="ann-date">Set on: {{ ann.date }}</span>
+        </div>
+        <div class="ann-title">{{ ann.title }}</div>
+        <div class="ann-body">{{ ann.content }}</div>
+      </div>
+      {% endfor %}
+      {% else %}
+      <p>No announcements at this time.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- DOWNLOADS PAGE -->
+<div id="page-downloads" class="page">
+  <div class="section">
+    <div class="section-heading">
+      <div class="section-icon">📁</div>
+      <div>
+        <h2>File Downloads</h2>
+        <p>Download official department resources below</p>
+      </div>
+    </div>
+
+    <div class="downloads-grid">
+      {% if files %}
+      {% for file in files %}
+      <div class="file-card">
+        <div class="file-icon-row">
+          <div class="file-icon {% if '.pdf' in file.name %}icon-pdf{% else %}icon-docx{% endif %}">
+            {% if '.pdf' in file.name %}📄{% else %}📝{% endif %}
+          </div>
+          <div class="file-info">
+            <div class="file-name">{{ file.name }}</div>
+            <div class="file-size">{{ file.size }}</div>
+          </div>
+        </div>
+        <a href="{{ url_for('download_file', filename=file.name) }}" class="download-btn">⬇ Download</a>
+      </div>
+      {% endfor %}
+      {% else %}
+      <p>No files available for download.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <span>CS Department Portal</span> &nbsp;·&nbsp; CSEC Academic Year 2025–2026 &nbsp;·&nbsp; All rights reserved
+</footer>
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+{% endblock %}
+</file>
+
+<file path="CHANGELOG.md">
+# **Changelog: SchoolPortal**
+
+All notable changes to this project will be documented in this file.
+
+## **[2026-05-13, 5:00AM] - Unreleased**
+
+### **Added**
+* **[HERMOSO]** - Drafted the final `README.md` deployment instructions and prerequisites  
+* **[HERMOSO]** - Set up base Flask app structure (`app.py`) with mock data for announcements and downloads
+* **[HERMOSO]** - Created base HTML templates (`base.html`, `index.html`, `announcements.html`, `downloads.html`) and requirements.txt
+
+## **[2026-05-13, 12:00PM] - Fixed Bicep validation error**
+
+### **Added**
+* **[HERMOSO]** - Wrote `main.bicep` template defining the baseline App Service, Azure SQL Database, and Autoscale rules
+* **[HERMOSO]** - Added Zone-Redundant Storage (ZRS) configuration to main.bicep to fulfill the fault tolerance optimization
+* **[HERMOSO]** - Successfully provisioned the complete baseline infrastructure to Azure via Bicep
+* **[QUITE]** - Designed and styled the CS Department Portal UI with external CSS and JavaScript files
+* **[QUITE]** - Created static/ folder with `style.css`, `script.js`, and ccs.png logo
+* **[QUITE]** - Updated templates/index.html with linked stylesheet and navigation script
+
+
+### **Fixed**
+* **[HERMOSO]** - Fixed Azure CLI Windows permission issue by overriding the local configuration directory path
+* **[HERMOSO]** - Fixed policy block error: Pivoted deployment region from southeastasia to eastasia to comply with student subscription policy restrictions
+* **[HERMOSO]** - Fixed Bicep validation error: Shortened the Storage Account name prefix to ensure the 24-character maximum length limit was not exceeded
+* **[HERMOSO]** - Resolved Azure SQL password complexity policy requirements to allow successful deployment
+
+
+## **[2026-05-13, 2:40PM] - Deployment**
+
+### **Added**
+* **[HERMOSO]** - Deployed the baseline Python Flask application to the App Service using Azure CLI ```az webapp up```
+
+## **[2026-05-13, 8:20PM] - Deployment**
+
+### **Added**
+* **[QUITE]** - Wrap content block in a flex container
+* **[QUITE]** - Add flexbox layout to main container and footer
+* **[QUITE]** - Update academic year text in index.html
+
+## **[2026-05-14, 4:00AM] - Infrastructure Deployment & App Integration**
+
+### **Changed**
+* **[HERMOSO]** - Overhauled `app.py` to replace mock data with dynamic `pyodbc` connections to Azure SQL and `azure-storage-blob` connections to Azure Storage.
+
+### **Fixed**
+* **[HERMOSO]** - Resolved strict tenant security policy block by disabling public blob access 
+* **[HERMOSO]** - Resolved routing file downloads securely through the Flask backend (`/download/<filename>`)
+---
+---
+# **Sample lang tong sa baba, copy paste na lang kayo**
+|
+
+|
+
+|
+
+|
+
+|
+
+|
+
+|
+
+|
+
+|
+
+---
+
+## ****[2026-05-13]** - Cost Report and Diagram Finalization**
+
+### **Added**
+
+* **[Groupmate 1 Name]** - Added pricing screenshots and cost optimization strategy (using basic tier SQL) to the cost report  
+* **[Groupmate 2 Name]** - Created presentation slides for the architecture walkthrough and cost review  
+* **[Your Name]** - Added Zone-Redundant Storage (ZRS) configuration to main.bicep to fulfill the fault tolerance optimization
+
+### **Changed**
+
+* **[Groupmate 2 Name]** - Updated architecture diagram to explicitly highlight the Autoscale and ZRS optimizations with red boundary lines
+
+### **Fixed**
+
+* **[Groupmate 1 Name]** - Fixed broken href links in the downloads.html template
+</file>
+
+</files>
