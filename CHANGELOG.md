@@ -56,41 +56,10 @@ All notable changes to this project will be documented in this file.
 * **[MOICO]** - Documented the private backend security isolation zone, explicitly detailing the restricted ODBC/TCP (Port 1433) and Azure REST API communication channels.
 * **[MOICO]** - Highlighted enterprise-level compute optimizations by detailing the dynamic Azure Monitor Autoscale rules.
 * **[MOICO]** - Visualized the backend fault-tolerance configurations by illustrating the Standard_ZRS (Zone-Redundant Storage) replication across availability zones.
----
----
-# **Sample lang tong sa baba, copy paste na lang kayo**
-|
 
-|
-
-|
-
-|
-
-|
-
-|
-
-|
-
-|
-
-|
-
----
-
-## ****[2026-05-13]** - Cost Report and Diagram Finalization**
+## **[2026-05-16, 9:00PM] -  Cost Estimate Report**
 
 ### **Added**
 
-* **[Groupmate 1 Name]** - Added pricing screenshots and cost optimization strategy (using basic tier SQL) to the cost report  
-* **[Groupmate 2 Name]** - Created presentation slides for the architecture walkthrough and cost review  
-* **[Your Name]** - Added Zone-Redundant Storage (ZRS) configuration to main.bicep to fulfill the fault tolerance optimization
-
-### **Changed**
-
-* **[Groupmate 2 Name]** - Updated architecture diagram to explicitly highlight the Autoscale and ZRS optimizations with red boundary lines
-
-### **Fixed**
-
-* **[Groupmate 1 Name]** - Fixed broken href links in the downloads.html template
+* **[QUITE]** - - Created `cost-estimate.md` report detailing Azure infrastructure monthly expenses.
+---
