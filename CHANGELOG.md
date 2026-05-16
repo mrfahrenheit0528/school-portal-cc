@@ -62,4 +62,12 @@ All notable changes to this project will be documented in this file.
 ### **Added**
 
 * **[QUITE]** - - Created `cost-estimate.md` report detailing Azure infrastructure monthly expenses.
+* **[QUITE]** - Prepared the script for the live demonstration.
+
+## **[2026-05-16, 11:30PM] - Final Validation & Video Presentation**
+
+### **Added**
+* **[HERMOSO]** - Finalized the deployment documentation
+* **[MOICO]** - Compiled the final architecture deliverables and verified the `README.md` perfectly matched the Bicep deployment parameters.
+
 ---
