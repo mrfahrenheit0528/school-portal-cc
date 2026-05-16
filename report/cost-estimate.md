@@ -41,7 +41,7 @@ $$ \text{Total Estimated Monthly Cost} = 138.70 + 4.90 + 10.52 = 154.12 $$
 
 ## 3. Azure Pricing Calculator Screenshot Reference
 
-![Azure Pricing Calculator Screenshot](./images/azure-pricing-screenshot.png)
+![Azure Pricing Calculator Screenshot](image/azure-pricing-screenshot.PNG)
 
 ---
 
