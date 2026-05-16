@@ -51,11 +51,11 @@ All notable changes to this project will be documented in this file.
 ## **[2026-05-16, 7:00PM] - Architecture & Documentation**
 
 ### **Added**
-[MOICO] - Designed and finalized the comprehensive Azure Cloud Architecture visual blueprint for the School Portal deployment.
-[MOICO] - Mapped the public-facing access layer, illustrating the secure HTTPS (Port 443) traffic flow from the internet to the Azure App Service frontend.
-[MOICO] - Documented the private backend security isolation zone, explicitly detailing the restricted ODBC/TCP (Port 1433) and Azure REST API communication channels.
-[MOICO] - Highlighted enterprise-level compute optimizations by detailing the dynamic Azure Monitor Autoscale rules.
-[MOICO] - Visualized the backend fault-tolerance configurations by illustrating the Standard_ZRS (Zone-Redundant Storage) replication across availability zones.
+* **[MOICO]** - Designed and finalized the comprehensive Azure Cloud Architecture visual blueprint for the School Portal deployment.
+* **[MOICO]** - Mapped the public-facing access layer, illustrating the secure HTTPS (Port 443) traffic flow from the internet to the Azure App Service frontend.
+* **[MOICO]** - Documented the private backend security isolation zone, explicitly detailing the restricted ODBC/TCP (Port 1433) and Azure REST API communication channels.
+* **[MOICO]** - Highlighted enterprise-level compute optimizations by detailing the dynamic Azure Monitor Autoscale rules.
+* **[MOICO]** - Visualized the backend fault-tolerance configurations by illustrating the Standard_ZRS (Zone-Redundant Storage) replication across availability zones.
 ---
 ---
 # **Sample lang tong sa baba, copy paste na lang kayo**
