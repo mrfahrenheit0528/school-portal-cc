@@ -36,6 +36,55 @@ body {
   flex-direction: column;
 }
 
+/* ── ANIMATIONS ── */
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(201, 153, 58, 0.25); }
+  50%      { box-shadow: 0 0 20px 4px rgba(201, 153, 58, 0.15); }
+}
+
+/* Scroll-reveal base class */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 /* ── NAVBAR ── */
 .navbar {
   background: var(--navy);
@@ -47,6 +96,7 @@ body {
   top: 0;
   z-index: 100;
   box-shadow: 0 2px 20px rgba(14, 27, 61, 0.35);
+  animation: fadeInDown 0.5s ease-out;
 }
 
 .navbar-brand {
@@ -70,6 +120,11 @@ body {
   font-size: 18px;
   color: var(--navy);
   flex-shrink: 0;
+  transition: transform 0.3s ease;
+}
+
+.navbar-brand:hover .navbar-logo {
+  transform: rotate(-6deg) scale(1.08);
 }
 
 .navbar-brand-text {
@@ -99,6 +154,14 @@ body {
   list-style: none;
 }
 
+.nav-links li {
+  animation: fadeIn 0.5s ease-out both;
+}
+
+.nav-links li:nth-child(1) { animation-delay: 0.15s; }
+.nav-links li:nth-child(2) { animation-delay: 0.25s; }
+.nav-links li:nth-child(3) { animation-delay: 0.35s; }
+
 .nav-links a {
   text-decoration: none;
   color: rgba(255, 255, 255, 0.72);
@@ -107,10 +170,29 @@ body {
   padding: 0.5rem 1rem;
   border-radius: var(--radius-sm);
   letter-spacing: 0.01em;
-  transition: background 0.18s, color 0.18s;
+  transition: background 0.25s ease, color 0.25s ease, transform 0.2s ease;
   display: flex;
   align-items: center;
   gap: 6px;
+  position: relative;
+}
+
+.nav-links a::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  width: 0;
+  height: 2px;
+  background: var(--gold-l);
+  border-radius: 2px;
+  transition: width 0.3s ease, left 0.3s ease;
+}
+
+.nav-links a:hover::after,
+.nav-links a.active::after {
+  width: 60%;
+  left: 20%;
 }
 
 .nav-links a:hover,
@@ -152,6 +234,7 @@ body {
   border-radius: 50px;
   margin-bottom: 1.5rem;
   position: relative;
+  animation: scaleIn 0.6s ease-out 0.2s both;
 }
 
 .hero h1 {
@@ -163,6 +246,7 @@ body {
   max-width: 640px;
   margin: 0 auto 1.25rem;
   position: relative;
+  animation: fadeInUp 0.7s ease-out 0.35s both;
 }
 
 .hero h1 span {
@@ -177,6 +261,7 @@ body {
   line-height: 1.75;
   font-weight: 300;
   position: relative;
+  animation: fadeInUp 0.7s ease-out 0.5s both;
 }
 
 .hero-cta-row {
@@ -185,6 +270,7 @@ body {
   justify-content: center;
   flex-wrap: wrap;
   position: relative;
+  animation: fadeInUp 0.7s ease-out 0.65s both;
 }
 
 /* ── BUTTONS ── */
@@ -197,14 +283,20 @@ body {
   border-radius: var(--radius-sm);
   text-decoration: none;
   letter-spacing: 0.01em;
-  transition: background 0.18s, transform 0.12s;
+  transition: background 0.25s ease, transform 0.2s ease, box-shadow 0.25s ease;
   border: none;
   cursor: pointer;
 }
 
 .btn-primary:hover {
   background: var(--gold-l);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(201, 153, 58, 0.35);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+  box-shadow: none;
 }
 
 .btn-outline {
@@ -217,12 +309,14 @@ body {
   text-decoration: none;
   border: 1px solid rgba(255, 255, 255, 0.22);
   letter-spacing: 0.01em;
-  transition: border-color 0.18s, color 0.18s;
+  transition: border-color 0.25s ease, color 0.25s ease, background 0.25s ease, transform 0.2s ease;
 }
 
 .btn-outline:hover {
   border-color: var(--gold-l);
   color: var(--gold-l);
+  background: rgba(201, 153, 58, 0.08);
+  transform: translateY(-2px);
 }
 
 /* ── PAGE SWITCHING ── */
@@ -232,6 +326,7 @@ body {
 
 .page.active {
   display: block;
+  animation: fadeIn 0.4s ease-out;
 }
 
 /* ── SECTION ── */
@@ -260,6 +355,11 @@ body {
   align-items: center;
   justify-content: center;
   font-size: 18px;
+  transition: transform 0.3s ease;
+}
+
+.section-heading:hover .section-icon {
+  transform: scale(1.1) rotate(-4deg);
 }
 
 .section-heading h2 {
@@ -289,13 +389,13 @@ body {
   border-radius: var(--radius);
   padding: 1.5rem 1.75rem;
   border-left: 4px solid var(--navy);
-  transition: box-shadow 0.2s, transform 0.15s;
+  transition: box-shadow 0.3s ease, transform 0.25s ease;
   position: relative;
 }
 
 .announcement-card:hover {
-  box-shadow: 0 6px 28px rgba(14, 27, 61, 0.09);
-  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(14, 27, 61, 0.12);
+  transform: translateY(-3px);
 }
 
 .announcement-card.urgent {
@@ -304,6 +404,10 @@ body {
 
 .announcement-card.event {
   border-left-color: var(--gold);
+}
+
+.announcement-card.notice {
+  border-left-color: var(--navy-l);
 }
 
 .ann-meta {
@@ -321,9 +425,15 @@ body {
   letter-spacing: 0.08em;
   padding: 3px 10px;
   border-radius: 50px;
+  transition: transform 0.2s ease;
 }
 
-.badge-announcement {
+.ann-badge:hover {
+  transform: scale(1.05);
+}
+
+.badge-announcement,
+.badge-notice {
   background: rgba(14, 27, 61, 0.08);
   color: var(--navy-l);
 }
@@ -375,12 +485,12 @@ body {
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  transition: box-shadow 0.2s, transform 0.15s;
+  transition: box-shadow 0.3s ease, transform 0.25s ease;
 }
 
 .file-card:hover {
-  box-shadow: 0 6px 24px rgba(14, 27, 61, 0.09);
-  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(14, 27, 61, 0.12);
+  transform: translateY(-3px);
 }
 
 .file-icon-row {
@@ -398,6 +508,11 @@ body {
   justify-content: center;
   font-size: 20px;
   flex-shrink: 0;
+  transition: transform 0.3s ease;
+}
+
+.file-card:hover .file-icon {
+  transform: scale(1.1);
 }
 
 .icon-pdf {
@@ -442,7 +557,7 @@ body {
   padding: 0.55rem 1rem;
   border-radius: var(--radius-sm);
   letter-spacing: 0.01em;
-  transition: background 0.18s;
+  transition: background 0.25s ease, transform 0.2s ease, box-shadow 0.25s ease;
   border: none;
   cursor: pointer;
   width: 100%;
@@ -450,6 +565,8 @@ body {
 
 .download-btn:hover {
   background: var(--navy-l);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(14, 27, 61, 0.2);
 }
 
 /* ── HOME QUICK LINKS ── */
@@ -468,14 +585,15 @@ body {
   text-align: center;
   cursor: pointer;
   text-decoration: none;
-  transition: box-shadow 0.2s, transform 0.15s;
+  transition: box-shadow 0.3s ease, transform 0.25s ease, border-color 0.3s ease;
   display: block;
   color: inherit;
 }
 
 .quick-card:hover {
-  box-shadow: 0 8px 32px rgba(14, 27, 61, 0.12);
-  transform: translateY(-3px);
+  box-shadow: 0 10px 40px rgba(14, 27, 61, 0.14);
+  transform: translateY(-4px);
+  border-color: var(--gold);
 }
 
 .quick-icon {
@@ -488,6 +606,12 @@ body {
   justify-content: center;
   font-size: 24px;
   margin: 0 auto 1rem;
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.3s ease;
+}
+
+.quick-card:hover .quick-icon {
+  transform: scale(1.15) rotate(-5deg);
+  background: var(--navy-m);
 }
 
 .quick-card h3 {
